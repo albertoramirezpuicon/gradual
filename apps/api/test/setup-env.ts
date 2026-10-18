@@ -1,0 +1,15 @@
+Object.assign(process.env, {
+  NODE_ENV: "test",
+  APP_BASE_URL: "http://localhost:3000",
+  DEFAULT_TENANT_SLUG: "gradual",
+  DB_HOST: process.env.TEST_DB_HOST ?? "127.0.0.1",
+  DB_PORT: process.env.TEST_DB_PORT ?? "3306",
+  DB_USER: process.env.TEST_DB_USER ?? "gradual",
+  DB_PASSWORD: process.env.TEST_DB_PASSWORD ?? "gradual",
+  DB_NAME: process.env.TEST_DB_NAME ?? "gradual_test",
+  S3_BUCKET: "gradual-test",
+  MAIL_TRANSPORT: "memory",
+  MAIL_FROM: "Gradual <no-responder@example.com>",
+  AWS_ACCESS_KEY_ID: "test",
+  AWS_SECRET_ACCESS_KEY: "test",
+});

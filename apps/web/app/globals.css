@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --brand-primary: #2f5d62;
+  --brand-on-primary: #ffffff;
+  --brand-secondary: #e07a5f;
+  --brand-on-secondary: #1c1917;
+  --brand-font: "Mulish";
+}
+
+@theme inline {
+  --color-primary: var(--brand-primary);
+  --color-on-primary: var(--brand-on-primary);
+  --color-secondary: var(--brand-secondary);
+  --color-on-secondary: var(--brand-on-secondary);
+  --color-primary-soft: color-mix(in srgb, var(--brand-primary) 10%, white);
+  --font-sans: var(--brand-font), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: #fafaf9;
+  color: #1c1917;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Privacy policy text rendered from Markdown */
+.prose-policy h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 1rem; }
+.prose-policy h2 { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 0.5rem; }
+.prose-policy p { margin: 0.5rem 0; line-height: 1.65; }
+.prose-policy ul, .prose-policy ol { margin: 0.5rem 0 0.5rem 1.25rem; line-height: 1.65; }
+.prose-policy ul { list-style: disc; }
+.prose-policy ol { list-style: decimal; }
+.prose-policy li { margin: 0.2rem 0; }
+.prose-policy strong { font-weight: 700; }
+
+/* Rich text resources (editor output and rendered view) */
+.rich-text > * + * { margin-top: 0.6rem; }
+.rich-text h2 { font-size: 1.1rem; font-weight: 700; }
+.rich-text h3 { font-size: 1rem; font-weight: 700; }
+.rich-text p { line-height: 1.65; }
+.rich-text ul { list-style: disc; padding-left: 1.25rem; }
+.rich-text ol { list-style: decimal; padding-left: 1.25rem; }
+.rich-text li { margin: 0.15rem 0; line-height: 1.6; }
+.rich-text blockquote { border-left: 3px solid var(--brand-primary); padding-left: 0.75rem; color: #57534e; }
+.rich-text a { color: var(--brand-primary); text-decoration: underline; text-underline-offset: 2px; }
+.rich-text strong { font-weight: 700; }
+.rich-text hr { border-color: #e7e5e4; }

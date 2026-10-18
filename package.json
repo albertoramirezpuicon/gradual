@@ -1,0 +1,19 @@
+{
+  "name": "gradual",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run build -w @gradual/shared",
+    "dev:api": "npm run dev -w @gradual/api",
+    "dev:web": "npm run dev -w @gradual/web",
+    "build": "npm run build -w @gradual/shared && npm run build -w @gradual/api && npm run build -w @gradual/web",
+    "migrate": "npm run migrate -w @gradual/api",
+    "test": "npm test -w @gradual/api"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
