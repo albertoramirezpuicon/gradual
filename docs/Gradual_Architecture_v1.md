@@ -2,7 +2,7 @@
 
 > Canonical reference document. Every decision is numbered, locked in order and cited by number. When a decision changes, it is updated here and the version is bumped.
 
-**Status:** v1.4 · 2026-10-18 · F0 and F1 built · Decisions D1–D43
+**Status:** v1.5 · 2026-10-18 · F0, F1 and F2 built · Decisions D1–D51
 
 ---
 
@@ -126,8 +126,9 @@ Every table uses the `gradual_` prefix (D33); it is omitted below for brevity.
 | `resources` | id, stage_id, type (file/link/video/text), title, description, s3_key, file_name, mime, size_bytes, url, youtube_id, content_html, position |
 | `route_assignments` | id, route_id, user_id, assigned_by, assigned_at |
 | `stage_completions` | id, stage_id, user_id, marked_by, marked_at |
-| `cv_prompts` | id, tenant_id, version, standards, active, created_by, created_at |
-| `cv_runs` | id, tenant_id, user_id, started_by, source_s3_key, extracted_text, prompt_id, provider, model, status, result_json, tokens_in, tokens_out, cost_usd, error, created_at |
+| `cv_prompts` | id, tenant_id, version, standards, created_by, created_at (highest version = active) |
+| `cv_runs` | id, tenant_id, user_id, started_by, source_s3_key, source_file_name, extracted_text, prompt_id, status (queued/processing/done/failed), attempts, provider, model, result_json, initial_score, final_score, tokens_in, tokens_out, cost_usd, error, created_at, started_at, finished_at |
+| `tenant_settings` (F2 column) | cv_footer_text |
 
 ---
 
@@ -265,3 +266,30 @@ Invitation, password recovery, deletion-request confirmation. The sender is conf
   - The client sees a thumbnail first.
   - The iframe loads from `youtube-nocookie.com` only when tapped.
 - **D43. Links:** only `http://` and `https://` URLs are accepted. They open in a new tab with `noopener noreferrer`.
+
+## 14. F2 decisions
+
+- **D44. LLM keys:** dedicated to Gradual (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`), so its costs are visible separately.
+  - A provider is used only when its key is set.
+  - The order comes from `LLM_PROVIDERS`; model IDs come from `*_MODEL`.
+  - Optional `LLM_PRICING` records the cost per run.
+  - Plain HTTPS calls are used, with no provider SDKs.
+- **D45. Default standards:** version 1 is seeded from `apps/api/src/db/seeds/cv-standards-v1.ts` (Spanish, consultant-facing). It covers structure, achievements with metrics, action verbs, ATS compatibility, at most 2 pages, and the scoring rubric.
+- **D46. Result:** a 0–100 score before and after, a summary addressed to the candidate, and per section the original, the improved text and 1–4 comments.
+- **D47. CV template:** a single neutral, ATS-friendly, one-column template with standard fonts and no consultant branding (the CV belongs to the candidate). The footer text is configurable under CV standards; the default is "Creado con la ayuda de Gradual", and an empty value hides it.
+- **D48. No invented facts:** the system prompt forbids adding employers, dates, numbers, tools or achievements that aren't in the original.
+  - Missing metrics become bracketed placeholders (e.g. `[agrega una cifra: %]`). The UI highlights them and suggests the editable Word download.
+  - Sensitive data (DNI, date of birth, marital status, photo) is dropped.
+  - CV text is wrapped in `<cv>` tags and treated as data (prompt-injection guard).
+- **D49. Processing:** asynchronous, through a MySQL-backed queue and an in-process worker that polls every 2 s and handles one run at a time.
+  - Runs are claimed atomically (no double processing).
+  - Each provider gets two tries (bad JSON counts as a failure), then the next provider is used.
+  - The output is validated with zod.
+  - Runs stuck in `processing` for more than 10 minutes are re-queued, up to 3 attempts.
+  - Users only ever see a generic error; provider details stay in `cv_runs.error`.
+  - `LLM_STUB=true` (development only, ignored in production) returns a sample result for testing without keys or cost.
+- **D50. Downloads:** PDF (`@react-pdf/renderer`) and DOCX (`docx`) are generated on demand from the stored result. Nothing extra is stored. The file is named "CV - <name>.pdf/.docx".
+- **D51. Visibility:** runs belong to the candidate.
+  - Admin-started runs appear in the client's history, marked "iniciado por la consultora", and don't count toward the monthly quota.
+  - Clients only ever see their own runs.
+- **Input limits:** PDF only, up to 5 MB and 6 pages. PDFs with fewer than 200 characters of extractable text are rejected as scanned. The upload is deleted whenever a run is rejected.

@@ -24,6 +24,29 @@ const schema = z.object({
   S3_ENDPOINT: z.string().url().optional(),
   MAIL_TRANSPORT: z.enum(["console", "ses", "memory"]).default("console"),
   MAIL_FROM: z.string(),
+
+  // --- LLM (D44): keys dedicated to Gradual; a provider is used only when its key is set ---
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  /** Rotation order; the first provider with a key is tried first, the rest are failover. */
+  LLM_PROVIDERS: z.string().default("anthropic,openai,gemini"),
+  ANTHROPIC_MODEL: z.string().default("claude-sonnet-5-5"),
+  OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
+  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
+  /** Optional per-model prices in USD per million tokens: {"model":[input,output]} */
+  LLM_PRICING: z.string().default("{}"),
+  /** Development only: answer with a canned sample result instead of calling a real LLM (ignored in production). */
+  LLM_STUB: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  /** Set to false to disable the in-process CV worker (e.g. when running a separate worker). */
+  CV_WORKER: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
 });
 
 export type Env = z.infer<typeof schema>;

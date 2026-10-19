@@ -11,6 +11,8 @@ export const app = createApp();
 export { db, outbox };
 
 const TABLES = [
+  "gradual_cv_runs",
+  "gradual_cv_prompts",
   "gradual_stage_completions",
   "gradual_route_assignments",
   "gradual_resources",

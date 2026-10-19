@@ -5,7 +5,7 @@ import { Shell, type NavItem } from "@/components/shell";
 // Labels are user-facing (Spanish); paths are code (English).
 const NAV: NavItem[] = [
   { href: "/app", label: "Mis rutas" },
-  { href: "/app/cv", label: "Mejorar mi CV", soon: true },
+  { href: "/app/cv", label: "Mejorar mi CV" },
   { href: "/app/profile", label: "Mi perfil" },
 ];
 

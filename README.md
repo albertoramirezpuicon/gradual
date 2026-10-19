@@ -36,6 +36,8 @@ npm run dev:web
 
 Open http://localhost:3000.
 
+For the CV improver, set at least one LLM key in `apps/api/.env` (see `.env.example`). To try the flow without keys or cost, set `LLM_STUB=true` (development only).
+
 With `MAIL_TRANSPORT=console`, emails (invitations, password recovery) are printed to the API console together with their link.
 
 ## Database user
@@ -55,7 +57,7 @@ npm test
 
 - **F0 ✅** Tenant, authentication (invitation, login, password recovery, lockout after 10 attempts), versioned privacy-policy consent, branding settings (logo, colors, font).
 - **F1 ✅** Routes (draft/published), stages, resources (file on S3, link, YouTube video, rich text), assignment to clients, per-stage progress marked by client or admin.
-- **F2** CV improver.
+- **F2 ✅** CV improver: PDF upload, text extraction, versioned standards prompt, LLM rotation with failover (background worker), score + per-section comments, PDF/DOCX download, 5 runs/month per client.
 - **F3** Retention, data deletion, SES and deployment.
 
 ## Notes

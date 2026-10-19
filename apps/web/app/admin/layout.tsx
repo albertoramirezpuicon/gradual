@@ -7,7 +7,7 @@ const NAV: NavItem[] = [
   { href: "/admin", label: "Inicio" },
   { href: "/admin/clients", label: "Clientes" },
   { href: "/admin/routes", label: "Rutas" },
-  { href: "/admin/cv", label: "Mejorador de CV", soon: true },
+  { href: "/admin/cv", label: "Mejorador de CV" },
   { href: "/admin/branding", label: "Marca" },
   { href: "/admin/privacy", label: "Privacidad" },
 ];

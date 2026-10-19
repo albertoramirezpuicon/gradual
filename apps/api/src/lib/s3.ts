@@ -33,6 +33,12 @@ export function presignGet(key: string, opts: { fileName?: string; inline?: bool
   );
 }
 
+/** Downloads an object fully into memory (used for CV PDFs, max 5 MB). */
+export async function getObjectBytes(key: string): Promise<Uint8Array> {
+  const r = await s3.send(new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
+  return r.Body!.transformToByteArray();
+}
+
 export async function headObject(key: string) {
   return s3.send(new HeadObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
 }
@@ -45,4 +51,5 @@ export async function deleteObject(key: string) {
 export const keys = {
   logo: (tenantId: string, id: string, ext: string) => `t/${tenantId}/branding/logo-${id}.${ext}`,
   resource: (tenantId: string, id: string, ext: string) => `t/${tenantId}/resources/${id}.${ext}`,
+  cv: (tenantId: string, userId: string, id: string) => `t/${tenantId}/cv/${userId}/${id}.pdf`,
 };

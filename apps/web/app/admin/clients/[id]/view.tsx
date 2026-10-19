@@ -42,7 +42,12 @@ export function ClientDetail({ initial }: { initial: ClientDetailDTO }) {
             {c.email} · {c.status === "active" ? `Último acceso: ${fmt(c.lastLoginAt)}` : "Invitación pendiente"}
           </p>
         </div>
-        <Button onClick={() => setAssignOpen(true)}>Asignar rutas</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="secondary">
+            <Link href={`/admin/cv?clientId=${c.id}`}>Análisis de CV</Link>
+          </Button>
+          <Button onClick={() => setAssignOpen(true)}>Asignar rutas</Button>
+        </div>
       </div>
       {error ? (
         <div className="mb-4">

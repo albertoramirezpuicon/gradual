@@ -312,3 +312,125 @@ export interface ClientDetailDTO extends ClientDTO {
   }[];
   availableRoutes: { id: string; title: string; published: boolean }[];
 }
+
+// =====================================================================
+// F2 — CV improver
+// =====================================================================
+
+export const CV_MAX_BYTES = 5 * 1024 * 1024;
+/** Client runs per calendar month, Lima time (D30). Admin-started and failed runs do not count. */
+export const CV_MONTHLY_LIMIT = 5;
+export const CV_RUN_STATUSES = ["queued", "processing", "done", "failed"] as const;
+export type CvRunStatus = (typeof CV_RUN_STATUSES)[number];
+
+export const cvUploadSchema = z.object({
+  mime: z.literal("application/pdf", { message: "Sube tu CV en formato PDF." }),
+  size: z.number().int().positive().max(CV_MAX_BYTES, "El PDF no puede superar 5 MB"),
+  fileName: z.string().trim().min(1).max(200),
+});
+
+export const cvRunCreateSchema = z.object({
+  key: z.string().min(1).max(300),
+  fileName: z.string().trim().min(1).max(200),
+  /** Required when the admin starts a run on behalf of a client. */
+  clientId: z.string().length(26).optional(),
+});
+
+export const cvStandardsSchema = z.object({ standards: z.string().trim().min(50, "Escribe al menos unas líneas de estándares").max(50_000) });
+export const cvSettingsSchema = z.object({ footerText: z.string().trim().max(120) });
+
+// ---------- Output contract (D21): keys in English, generated content in Spanish ----------
+
+const str = z.string().trim().max(4000);
+const shortStr = z.string().trim().max(300);
+const optShort = shortStr.optional().default("");
+
+export const improvedCvSchema = z.object({
+  name: shortStr,
+  headline: optShort,
+  contact: z
+    .object({ email: optShort, phone: optShort, location: optShort, linkedin: optShort, website: optShort })
+    .default({ email: "", phone: "", location: "", linkedin: "", website: "" }),
+  profile: str.optional().default(""),
+  experience: z
+    .array(
+      z.object({
+        role: shortStr,
+        company: optShort,
+        location: optShort,
+        start: optShort,
+        end: optShort,
+        bullets: z.array(str).max(15).default([]),
+      }),
+    )
+    .max(20)
+    .default([]),
+  education: z
+    .array(
+      z.object({ degree: shortStr, institution: optShort, location: optShort, start: optShort, end: optShort, details: str.optional().default("") }),
+    )
+    .max(15)
+    .default([]),
+  skills: z.array(shortStr).max(40).default([]),
+  languages: z.array(z.object({ language: shortStr, level: optShort })).max(10).default([]),
+  certifications: z.array(shortStr).max(20).default([]),
+  other: z.array(z.object({ title: shortStr, items: z.array(str).max(15).default([]) })).max(6).default([]),
+});
+export type ImprovedCv = z.infer<typeof improvedCvSchema>;
+
+export const cvResultSchema = z.object({
+  summary: str,
+  initialScore: z.number().int().min(0).max(100),
+  finalScore: z.number().int().min(0).max(100),
+  sections: z
+    .array(
+      z.object({
+        name: shortStr,
+        original: str.optional().default(""),
+        improved: str.optional().default(""),
+        comments: z.array(z.string().trim().max(1000)).max(10).default([]),
+      }),
+    )
+    .min(1)
+    .max(15),
+  improvedCv: improvedCvSchema,
+});
+export type CvResult = z.infer<typeof cvResultSchema>;
+
+export interface CvRunSummaryDTO {
+  id: string;
+  clientId: string;
+  clientName: string;
+  status: CvRunStatus;
+  sourceFileName: string;
+  startedBy: "client" | "admin";
+  initialScore: number | null;
+  finalScore: number | null;
+  createdAt: string;
+}
+
+export interface CvRunDTO extends CvRunSummaryDTO {
+  result: CvResult | null;
+  /** User-facing (Spanish) error message when status is "failed". */
+  error: string | null;
+  promptVersion: number;
+}
+
+export interface CvQuotaDTO {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface CvPromptVersionDTO {
+  id: string;
+  version: number;
+  createdAt: string;
+  runs: number;
+}
+
+export interface CvStandardsDTO {
+  current: { id: string; version: number; standards: string; createdAt: string };
+  versions: CvPromptVersionDTO[];
+  footerText: string;
+}
