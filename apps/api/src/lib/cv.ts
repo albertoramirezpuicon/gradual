@@ -13,7 +13,16 @@ import { env } from "./env.js";
 import { HttpError, newId, now, iso, HOUR } from "./util.js";
 import { CV_STANDARDS_V1 } from "../db/seeds/cv-standards-v1.js";
 import { buildSystemPrompt, buildUserPrompt } from "./cv-prompt.js";
+import { z } from "zod";
 import { providers, costUsd, extractJson, type LlmResponse } from "./llm.js";
+
+/** JSON Schema of the output contract, used for structured output (Anthropic tool use). */
+const { $schema: _ignored, ...CV_RESULT_JSON_SCHEMA } = z.toJSONSchema(cvResultSchema, { io: "input" }) as Record<string, unknown>;
+const CV_TOOL = {
+  name: "submit_cv_result",
+  description: "Return the CV analysis and the improved CV using exactly this structure.",
+  schema: CV_RESULT_JSON_SCHEMA,
+};
 
 // =====================================================================
 // Standards prompt (D20): highest version is active; v1 is seeded lazily
@@ -107,7 +116,7 @@ async function generate(system: string, user: string): Promise<{ res: LlmRespons
   for (const p of list) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const res = await p.complete({ system, user, maxTokens: 8000 });
+        const res = await p.complete({ system, user, maxTokens: 16000, tool: CV_TOOL });
         const parsed = cvResultSchema.safeParse(extractJson(res.text));
         if (!parsed.success) throw new Error(`Invalid output: ${parsed.error.issues[0]?.path.join(".")} ${parsed.error.issues[0]?.message}`);
         return { res, result: parsed.data };
@@ -139,7 +148,10 @@ export async function processRun(id: string): Promise<void> {
       finished_at: now(),
     });
   } catch (e) {
-    await db("gradual_cv_runs").where({ id }).update({ status: "failed", error: (e as Error).message.slice(0, 4000), finished_at: now() });
+    const message = (e as Error).message.slice(0, 4000);
+    await db("gradual_cv_runs").where({ id }).update({ status: "failed", error: message, finished_at: now() });
+    // Visible in `pm2 logs gradual-api` (provider error messages never include API keys)
+    console.error(`CV run ${id} failed: ${message.slice(0, 1500)}`);
   }
 }
 

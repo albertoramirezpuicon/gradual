@@ -1,3 +1,4 @@
+import { jsonrepair } from "jsonrepair";
 import { env } from "./env.js";
 
 /**
@@ -12,6 +13,11 @@ export interface LlmRequest {
   user: string;
   /** Upper bound for the response length. */
   maxTokens: number;
+  /**
+   * Structured output. Providers that support it (Anthropic tool use) are forced to answer through this
+   * tool, so the API guarantees well-formed JSON instead of JSON embedded in free text.
+   */
+  tool?: { name: string; description: string; schema: Record<string, unknown> };
 }
 
 export interface LlmResponse {
@@ -50,12 +56,22 @@ const anthropic = (key: string, model: string): Provider => ({
   name: "anthropic",
   model,
   async complete(req) {
-    const j = await postJson(
-      "https://api.anthropic.com/v1/messages",
-      { "x-api-key": key, "anthropic-version": "2023-06-01" },
-      { model, max_tokens: req.maxTokens, system: req.system, messages: [{ role: "user", content: req.user }] },
-    );
-    const text = (j.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+    const body: Record<string, unknown> = {
+      model,
+      max_tokens: req.maxTokens,
+      system: req.system,
+      messages: [{ role: "user", content: req.user }],
+    };
+    if (req.tool) {
+      body.tools = [{ name: req.tool.name, description: req.tool.description, input_schema: req.tool.schema }];
+      body.tool_choice = { type: "tool", name: req.tool.name };
+    }
+    const j = await postJson("https://api.anthropic.com/v1/messages", { "x-api-key": key, "anthropic-version": "2023-06-01" }, body);
+    if (j.stop_reason === "max_tokens") throw new Error("Output truncated (max_tokens reached)");
+    const toolUse = (j.content ?? []).find((c: any) => c.type === "tool_use");
+    const text = toolUse
+      ? JSON.stringify(toolUse.input)
+      : (j.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
     return { provider: "anthropic", model, text, tokensIn: j.usage?.input_tokens ?? 0, tokensOut: j.usage?.output_tokens ?? 0 };
   },
 });
@@ -110,6 +126,9 @@ const gemini = (key: string, model: string): Provider => ({
     };
   },
 });
+
+/** Exposed for tests of the provider adapters. */
+export const adapters = { anthropic: (key: string, model: string) => anthropic(key, model) };
 
 let override: Provider[] | null = null;
 
@@ -189,12 +208,24 @@ export function costUsd(model: string, tokensIn: number, tokensOut: number): num
   }
 }
 
-/** Extracts the first JSON object from a model reply (tolerates code fences or stray text). */
+/**
+ * Extracts the first JSON object from a model reply (tolerates code fences or stray text).
+ * If strict parsing fails (e.g. an unescaped quote inside a string), a repair pass is attempted.
+ */
 export function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = fenced ? fenced[1]! : text;
   const start = raw.indexOf("{");
   const end = raw.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("No JSON object in model output");
-  return JSON.parse(raw.slice(start, end + 1));
+  const candidate = raw.slice(start, end + 1);
+  try {
+    return JSON.parse(candidate);
+  } catch (strictError) {
+    try {
+      return JSON.parse(jsonrepair(candidate));
+    } catch {
+      throw strictError;
+    }
+  }
 }

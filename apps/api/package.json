@@ -25,6 +25,7 @@
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
+    "jsonrepair": "^3.15.0",
     "knex": "^3.3.0",
     "mysql2": "^3.24.6",
     "react": "^19.3.1",
