@@ -1,0 +1,120 @@
+# Deploy Gradual to the production server (same EC2 as Admisiones360).
+#
+# Runs on every push to main, or manually ("Run workflow") — one click.
+# The runner builds everything, syncs the built tree to the production directory,
+# installs production dependencies, applies DB migrations and reloads PM2.
+#
+# Prerequisites on the server (/home/ubuntu/gradual), see docs/deploy/DEPLOY.md:
+#   - Self-hosted runner with label gradual-runner
+#   - apps/api/.env (never committed — this workflow never writes secrets)
+#   - PM2, Node.js 22, nginx site for the Gradual subdomain
+#
+# Migrations ARE run here (unlike Admisiones360): the `gradual` MySQL user can only touch
+# gradual_* tables (D34). If a GRANT is missing, the migration fails and PM2 is NOT reloaded,
+# so the running version stays up.
+
+name: Deploy Gradual
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never run two deploys at the same time
+concurrency:
+  group: deploy-gradual
+  cancel-in-progress: false
+
+env:
+  PROD_DIR: /home/ubuntu/gradual
+  # Must match the API port in ecosystem.config.cjs; Next.js bakes rewrites in at build time.
+  API_URL: http://127.0.0.1:4110
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, gradual-runner]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify checkout
+        run: |
+          set -euo pipefail
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE" | head -25
+          if [ ! -f "$GITHUB_WORKSPACE/package.json" ]; then
+            echo "Checkout missing package.json — aborting before rsync (would wipe prod with --delete)"
+            exit 1
+          fi
+
+      - name: Verify production .env exists
+        run: |
+          set -euo pipefail
+          if [ ! -f "$PROD_DIR/apps/api/.env" ]; then
+            echo "Missing $PROD_DIR/apps/api/.env — create it first (docs/deploy/DEPLOY.md)"
+            exit 1
+          fi
+
+      - name: Install dependencies (build)
+        working-directory: ${{ github.workspace }}
+        run: npm ci
+
+      - name: Tests
+        working-directory: ${{ github.workspace }}
+        # API tests need a disposable *_test database; skipped on the server (they run locally).
+        run: npm run typecheck --if-present
+
+      - name: Production build (shared, api, web)
+        working-directory: ${{ github.workspace }}
+        run: npm run build
+
+      - name: Sync to production directory
+        run: |
+          set -euo pipefail
+          mkdir -p "$PROD_DIR"
+          rsync -a --delete \
+            --exclude node_modules \
+            --exclude .git \
+            --exclude .github \
+            --exclude .env \
+            --exclude .env.local \
+            --exclude '.next/cache' \
+            "$GITHUB_WORKSPACE/" "$PROD_DIR/"
+          echo "Production directory after sync:"
+          ls -la "$PROD_DIR" | head -25
+          test -f "$PROD_DIR/package.json"
+          test -f "$PROD_DIR/apps/api/dist/server.js"
+          test -d "$PROD_DIR/apps/web/.next"
+
+      - name: Install production dependencies
+        working-directory: ${{ env.PROD_DIR }}
+        # --ignore-scripts: postinstall would rebuild packages/shared with TypeScript (a devDependency);
+        # the already-built dist/ arrives with the rsync above.
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Database migrations
+        working-directory: ${{ env.PROD_DIR }}
+        run: npm run migrate:prod -w @gradual/api
+
+      - name: Reload PM2
+        working-directory: ${{ env.PROD_DIR }}
+        run: |
+          set -euo pipefail
+          if pm2 describe gradual-api > /dev/null 2>&1; then
+            pm2 reload ecosystem.config.cjs --update-env
+          else
+            pm2 start ecosystem.config.cjs
+          fi
+          pm2 save
+
+      - name: Health check
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:4110/health > /dev/null && curl -fsS -o /dev/null http://127.0.0.1:3110/login; then
+              echo "API and web are up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "Health check failed"; pm2 logs gradual-api --lines 40 --nostream; exit 1

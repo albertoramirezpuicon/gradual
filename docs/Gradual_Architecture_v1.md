@@ -312,9 +312,9 @@ Invitation, password recovery, deletion-request confirmation. The sender is conf
   - Used or expired auth tokens older than a day are deleted.
   - The job is idempotent.
 - **D55. Production:**
-  - Same EC2, PM2 (`ecosystem.config.cjs`, one API instance because the worker and job run inside it), nginx (`docs/deploy/nginx-gradual.conf`) and certbot HTTPS.
+  - Same EC2, PM2 (`ecosystem.config.cjs`, one API instance because the worker and job run inside it), nginx (`docs/deploy/gradual.genia.pro.conf`; site files are named after the FQDN + .conf) and certbot HTTPS.
   - API and web bind to 127.0.0.1.
-  - Separate `gradual-prod` bucket; AWS access comes from the EC2 instance role.
+  - Same S3 bucket as development (`gradual-dev`), because dev and prod share the `gradual_*` tables; AWS access comes from the EC2 instance role.
   - `COOKIE_SECURE=true`, `MAIL_TRANSPORT=ses`.
   - Step-by-step guide: `docs/deploy/DEPLOY.md`.
 - **D56. Migration history:** migration names are recorded without file extension (custom Knex migration source). The same history works from TypeScript (dev) and compiled JS (prod). Older `.ts` names are normalized automatically by `migrateLatest()`.

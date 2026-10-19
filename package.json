@@ -11,7 +11,8 @@
     "dev:web": "npm run dev -w @gradual/web",
     "build": "npm run build -w @gradual/shared && npm run build -w @gradual/api && npm run build -w @gradual/web",
     "migrate": "npm run migrate -w @gradual/api",
-    "test": "npm test -w @gradual/api"
+    "test": "npm test -w @gradual/api",
+    "typecheck": "npm run build -w @gradual/shared && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit"
   },
   "engines": {
     "node": ">=22"
