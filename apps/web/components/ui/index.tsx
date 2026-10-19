@@ -61,11 +61,11 @@ export function Label(props: React.ComponentProps<typeof LabelPrimitive.Root>) {
 const fieldBase =
   "w-full rounded-lg border border-stone-300 bg-white px-3 text-sm text-stone-900 placeholder:text-stone-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:bg-stone-100";
 
-export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input(props: React.ComponentProps<"input">) {
   return <input {...props} className={cn(fieldBase, "h-10", props.className)} />;
 }
 
-export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea(props: React.ComponentProps<"textarea">) {
   return <textarea {...props} className={cn(fieldBase, "py-2 leading-relaxed", props.className)} />;
 }
 

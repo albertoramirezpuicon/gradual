@@ -2,7 +2,7 @@
 
 > Canonical reference document. Every decision is numbered, locked in order and cited by number. When a decision changes, it is updated here and the version is bumped.
 
-**Status:** v1.6 · 2026-10-19 · F0–F3 built (v1 feature-complete) · Decisions D1–D56
+**Status:** v1.7 · 2026-10-19 · F0–F4 built · Decisions D1–D68
 
 ---
 
@@ -319,3 +319,24 @@ Invitation, password recovery, deletion-request confirmation. The sender is conf
   - Step-by-step guide: `docs/deploy/DEPLOY.md`.
 - **D56. Migration history:** migration names are recorded without file extension (custom Knex migration source). The same history works from TypeScript (dev) and compiled JS (prod). Older `.ts` names are normalized automatically by `migrateLatest()`.
 - **Polish:** Spanish 404 and error pages; Next's defaults were in English and are customer-facing.
+
+## 16. F4 decisions — editable emails and platform owner
+
+- **D57. Editable emails:** tenant admins edit the subject, body and button label of each email from **Correos** in the admin panel.
+  - Templates: invitation, password recovery, deletion request (to the client) and deletion request (to the admins).
+  - The layout is fixed (logo/brand name, primary color, button, "Si el botón no funciona…" fallback link). Admins cannot write HTML.
+- **D58. Variables:** `{{nombre}}`, `{{marca}}`, `{{enlace}}` in every template; the admin notification also has `{{cliente}}` and `{{correo_cliente}}`. Unknown variables are rejected on save. Values are HTML-escaped; a blank line separates paragraphs.
+- **D59. Defaults, restore and test:** the original texts live in `@gradual/shared` (`EMAIL_TEMPLATES`). Only overrides are stored. "Restaurar texto original" deletes the override; saving text identical to the default also deletes it. "Enviarme una prueba" sends the unsaved draft to the admin's own email, prefixed with "[Prueba]". The editor shows a live preview with sample data.
+- **D60. Platform owner (superadmin):** a third role, `superadmin`, held only by Alberto. It lives in the main tenant, uses the same login, and lands on **Plataforma** (`/platform`).
+  - Functions: list tenants with metrics, create a tenant, rename, suspend/reactivate, invite or re-invite tenant admins, support mode.
+- **D61. Role routing:** `/` sends each role to its area (superadmin → `/platform`, admin → `/admin`, client → `/app`). A superadmin is not a tenant admin: the admin panel is reached only through support mode.
+- **D62. Tenant domains:** new tenants live at `<subdomain>.genia.pro` (`PLATFORM_DOMAIN_SUFFIX`, temporary). The subdomain is also the tenant slug. Email links always point to the tenant's own domain in production.
+- **D63. Domain setup is manual:** DNS, nginx and SSL are done by hand. After creating a tenant, its page shows the exact steps ready to copy: A record, nginx site file `/etc/nginx/sites-available/<fqdn>.conf` (FQDN naming policy) with symlink, certbot, and the new origin for the `gradual-dev` CORS rule.
+- **D64. Storage:** no new tables. `users.role` gains `superadmin`; `tenants.status` (active/suspended); `sessions.acting_user_id`; `tenant_settings.email_templates` (JSON overrides). Migration `20261019_005_f4_platform`, no new GRANTs.
+- **D65. Creating the superadmin:** CLI only (`create-superadmin`), never from the UI. It creates the user in the main tenant, or promotes an existing one (which then stops being a tenant admin). Recommended: a separate address (e.g. a `+platform` alias) so the tenant admin account stays as is.
+- **D66. Support mode (impersonation):** the superadmin picks an active admin of any tenant and "Entrar como…". The session row records `acting_user_id`; every request then runs as that admin, in that admin's tenant.
+  - A yellow "Modo soporte" bar is always visible with "Volver a Plataforma".
+  - Password change is blocked while acting as someone else; platform endpoints are unavailable until support mode ends.
+  - Start and end are logged (`[support] … started/stopped acting as …`).
+- **D67. Metrics:** per tenant: active and invited clients, routes, completed CV analyses (this month and total), LLM cost this month (Lima calendar month, from recorded `cost_usd`; "—" without pricing), last login of any user. Computed on request; no extra storage.
+- **D68. Suspension:** a suspended tenant answers every request with "Este espacio está suspendido temporalmente." (503). Nothing is deleted; it can be reactivated. The main tenant cannot be suspended (it hosts the superadmin).

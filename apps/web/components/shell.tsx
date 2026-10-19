@@ -18,10 +18,23 @@ async function logout() {
 }
 
 /** Sidebar on desktop, collapsible menu on mobile. */
-export function Shell({ brand, nav, userName, children }: { brand: React.ReactNode; nav: NavItem[]; userName: string; children: React.ReactNode }) {
+export function Shell({
+  brand,
+  nav,
+  userName,
+  banner,
+  children,
+}: {
+  brand: React.ReactNode;
+  nav: NavItem[];
+  userName: string;
+  /** Optional full-width bar above the layout (e.g. support mode, D66). */
+  banner?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
-  const isActive = (href: string) => (href === "/admin" || href === "/app" ? path === href : path.startsWith(href));
+  const isActive = (href: string) => (["/admin", "/app", "/platform"].includes(href) ? path === href : path.startsWith(href));
 
   const links = (
     <nav className="flex flex-col gap-1">
@@ -58,6 +71,8 @@ export function Shell({ brand, nav, userName, children }: { brand: React.ReactNo
   );
 
   return (
+    <>
+    {banner}
     <div className="min-h-dvh lg:flex">
       <aside className="hidden w-60 shrink-0 flex-col justify-between border-r border-stone-200 bg-white p-4 lg:flex lg:sticky lg:top-0 lg:h-dvh">
         <div className="space-y-6">
@@ -88,6 +103,7 @@ export function Shell({ brand, nav, userName, children }: { brand: React.ReactNo
         <div className="mx-auto max-w-5xl">{children}</div>
       </main>
     </div>
+    </>
   );
 }
 

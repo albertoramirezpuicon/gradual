@@ -25,6 +25,8 @@ npm install          # also builds packages/shared (postinstall)
 cp apps/api/.env.example apps/api/.env        # fill in DB credentials
 npm run migrate
 npm run create-admin -w @gradual/api -- --email you@example.com --name "First Last"
+# Optional: the platform owner (Plataforma section)
+npm run create-superadmin -w @gradual/api -- --email you+platform@example.com --name "First Last"
 
 # Web
 cp apps/web/.env.example apps/web/.env.local
@@ -59,6 +61,7 @@ npm test
 - **F1 ✅** Routes (draft/published), stages, resources (file on S3, link, YouTube video, rich text), assignment to clients, per-stage progress marked by client or admin.
 - **F2 ✅** CV improver: PDF upload, text extraction, versioned standards prompt, LLM rotation with failover (background worker), score + per-section comments, PDF/DOCX download, 5 runs/month per client.
 - **F3 ✅** Client deletion requests and admin hard delete, daily retention purge (CV PDFs > 180 days) and cleanup, production setup (PM2, nginx, HTTPS). Deploy guide: [`docs/deploy/DEPLOY.md`](docs/deploy/DEPLOY.md).
+- **F4 ✅** Editable email texts per tenant (variables, preview, restore, test send). Platform owner area (**Plataforma**): tenants on `<subdomain>.genia.pro`, usage metrics, suspension, tenant admin invitations, support mode, and the domain setup steps for each new tenant.
 
 ## Notes
 

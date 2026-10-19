@@ -11,7 +11,9 @@
     "create-admin": "tsx --env-file=.env src/scripts/create-admin.ts",
     "test": "vitest run",
     "migrate:prod": "node --env-file=.env dist/scripts/migrate.js",
-    "create-admin:prod": "node --env-file=.env dist/scripts/create-admin.js"
+    "create-admin:prod": "node --env-file=.env dist/scripts/create-admin.js",
+    "create-superadmin": "tsx --env-file=.env src/scripts/create-superadmin.ts",
+    "create-superadmin:prod": "node --env-file=.env dist/scripts/create-superadmin.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",

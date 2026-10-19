@@ -26,6 +26,8 @@ const schema = z.object({
   S3_ENDPOINT: z.string().url().optional(),
   MAIL_TRANSPORT: z.enum(["console", "ses", "memory"]).default("console"),
   MAIL_FROM: z.string(),
+  /** Base domain for tenant subdomains: tenants live at <subdomain>.<suffix> (D62). */
+  PLATFORM_DOMAIN_SUFFIX: z.string().default("genia.pro"),
 
   // --- LLM (D44): keys dedicated to Gradual; a provider is used only when its key is set ---
   OPENAI_API_KEY: z.string().optional(),
@@ -34,7 +36,7 @@ const schema = z.object({
   /** Rotation order; the first provider with a key is tried first, the rest are failover. */
   LLM_PROVIDERS: z.string().default("anthropic,openai,gemini"),
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-5-5"),
-  OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
+  OPENAI_MODEL: z.string().default("gpt-5.4-mini"),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   /** Optional per-model prices in USD per million tokens: {"model":[input,output]} */
   LLM_PRICING: z.string().default("{}"),

@@ -37,11 +37,14 @@ export async function getMe(): Promise<Me | null> {
   return (await r.json()) as Me;
 }
 
+/** Landing area for each role (D61). */
+export const homeFor = (role: Role) => ({ superadmin: "/platform", admin: "/admin", client: "/app" })[role];
+
 /** Section guard: requires a session, the given role and (for clients) consent to the current policy. */
 export async function requireUser(role: Role): Promise<Me> {
   const me = await getMe();
   if (!me) redirect("/login");
-  if (me.role !== role) redirect(me.role === "admin" ? "/admin" : "/app");
+  if (me.role !== role) redirect(homeFor(me.role));
   if (me.requiresConsent) redirect("/consent");
   return me;
 }

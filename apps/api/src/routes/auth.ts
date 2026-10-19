@@ -15,7 +15,7 @@ import { env } from "../lib/env.js";
 import { HttpError, parse, hashToken, newId, newToken, now, addMs, iso, HOUR } from "../lib/util.js";
 import { requireAuth, currentPolicy, type UserRow } from "../middleware/context.js";
 import { hashPassword, verifyPassword, dummyVerify, startSession, clearSessionCookie, toMe } from "../lib/session.js";
-import { sendMail, resetPasswordMail, deletionRequestedMail, deletionRequestAdminMail } from "../lib/mail.js";
+import { sendTemplate } from "../lib/email-templates.js";
 import { getBranding } from "../lib/branding.js";
 
 export const authRouter = Router();
@@ -70,7 +70,15 @@ authRouter.post("/logout", async (req, res) => {
 });
 
 authRouter.get("/me", requireAuth, async (req, res) => {
-  res.json(await toMe(req.user!));
+  res.json(await toMe(req.user!, req));
+});
+
+/** Leaves support mode and returns to the superadmin's own session (D66). */
+authRouter.post("/stop-impersonation", requireAuth, async (req, res) => {
+  if (!req.impersonator) throw new HttpError(400, "No estás en modo soporte.");
+  await db("gradual_sessions").where({ id: req.sessionId! }).update({ acting_user_id: null });
+  console.log(`[support] ${req.impersonator.email} stopped acting as ${req.user!.email} (tenant ${req.tenant.slug})`);
+  res.json(await toMe(req.impersonator));
 });
 
 // ---------- Password recovery ----------
@@ -91,16 +99,7 @@ authRouter.post("/forgot-password", forgotLimiter, async (req, res) => {
       expires_at: addMs(now(), HOUR),
       created_at: now(),
     });
-    const b = await getBranding(req.tenant.id);
-    await sendMail(
-      resetPasswordMail({
-        to: u.email,
-        name: u.name,
-        brand: b.brandName,
-        color: b.primaryColor,
-        url: `${env.APP_BASE_URL}/reset-password?token=${token}`,
-      }),
-    );
+    await sendTemplate(req.tenant, "reset_password", u.email, { nombre: u.name }, `/reset-password?token=${token}`);
   }
   // Same response whether or not the email exists.
   res.json({ ok: true });
@@ -198,6 +197,7 @@ authRouter.post("/consent", requireAuth, async (req, res) => {
 // ---------- Change password ----------
 
 authRouter.post("/change-password", requireAuth, async (req, res) => {
+  if (req.impersonator) throw new HttpError(403, "En modo soporte no puedes cambiar la contraseña del usuario.");
   const { currentPassword, newPassword } = parse(changePasswordSchema, req.body);
   const u = req.user!;
   if (!u.password_hash || !(await verifyPassword(u.password_hash, currentPassword))) {
@@ -219,22 +219,15 @@ authRouter.post("/deletion-request", requireAuth, async (req, res) => {
     const at = now();
     await db("gradual_users").where({ id: u.id }).update({ deletion_requested_at: at });
     u.deletion_requested_at = at;
-    const b = await getBranding(req.tenant.id);
-    await sendMail(
-      deletionRequestedMail({ to: u.email, name: u.name, brand: b.brandName, color: b.primaryColor, url: `${env.APP_BASE_URL}/app/profile` }),
-    );
+    await sendTemplate(req.tenant, "deletion_requested", u.email, { nombre: u.name }, "/app/profile");
     const admins: UserRow[] = await db("gradual_users").where({ tenant_id: req.tenant.id, role: "admin", status: "active" });
     for (const a of admins) {
-      await sendMail(
-        deletionRequestAdminMail({
-          to: a.email,
-          name: a.name,
-          brand: b.brandName,
-          color: b.primaryColor,
-          url: `${env.APP_BASE_URL}/admin/clients/${u.id}`,
-          clientName: u.name,
-          clientEmail: u.email,
-        }),
+      await sendTemplate(
+        req.tenant,
+        "deletion_request_admin",
+        a.email,
+        { nombre: a.name, cliente: u.name, correo_cliente: u.email },
+        `/admin/clients/${u.id}`,
       );
     }
   }

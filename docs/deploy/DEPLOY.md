@@ -46,6 +46,15 @@ On every push to `main` (or "Run workflow" in GitHub → Actions → Deploy Grad
    npm run create-admin:prod -w @gradual/api -- --email <her email> --name "<her name>" --tenant "<consultancy>" --domain <subdomain>
    ```
 
+7. Create the platform owner once (D65). Use a separate address so the tenant admin account stays as it is:
+   ```bash
+   cd /home/ubuntu/gradual
+   npm run create-superadmin:prod -w @gradual/api -- --email <alias>+platform@gmail.com --name "<name>"
+   ```
+
+## New tenants (D62/D63)
+Create the tenant in **Plataforma → Nuevo tenant**. Its page then shows the exact steps to copy: DNS A record, nginx site file `<fqdn>.conf`, certbot, and the origin to add to the `gradual-dev` CORS rule. No deploy or restart is needed.
+
 ## Smoke test after the first deploy
 - `https://<subdomain>` shows the login with HTTPS.
 - Upload the logo (tests S3 PUT and CORS).

@@ -4,7 +4,8 @@ import { z } from "zod";
 
 // ---------- Constants ----------
 
-export const ROLES = ["admin", "client"] as const;
+/** superadmin = platform owner (D63); admin = a tenant's consultant; client = her clients. */
+export const ROLES = ["superadmin", "admin", "client"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const USER_STATUSES = ["invited", "active", "deleted"] as const;
@@ -108,6 +109,8 @@ export interface Me {
   deletionRequestedAt: string | null;
   /** True when a published policy version exists that this user has not accepted yet. */
   requiresConsent: boolean;
+  /** Set when the platform superadmin is acting as this user (support mode, D66). */
+  impersonation: { tenantName: string; superadminName: string } | null;
 }
 
 export interface PolicyDTO {
@@ -440,4 +443,153 @@ export interface CvStandardsDTO {
   current: { id: string; version: number; standards: string; createdAt: string };
   versions: CvPromptVersionDTO[];
   footerText: string;
+}
+
+// =====================================================================
+// F4 — Editable email templates (D57–D59)
+// =====================================================================
+
+export const EMAIL_TEMPLATE_KEYS = ["invitation", "reset_password", "deletion_requested", "deletion_request_admin"] as const;
+export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
+
+export interface EmailTemplateContent {
+  subject: string;
+  /** Plain text; a blank line separates paragraphs. Variables use {{name}} syntax. */
+  body: string;
+  buttonLabel: string;
+}
+
+export interface EmailTemplateDef {
+  /** User-facing (Spanish) name and purpose shown in the editor. */
+  label: string;
+  description: string;
+  /** Variables available in this template (without braces). */
+  variables: string[];
+  defaults: EmailTemplateContent;
+}
+
+/** Common variables: nombre (recipient), marca (brand name), enlace (the button link). */
+const BASE_VARS = ["nombre", "marca", "enlace"];
+
+/** Built-in templates. Labels, descriptions and default texts are customer-facing, so they are in Spanish. */
+export const EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDef> = {
+  invitation: {
+    label: "Invitación",
+    description: "Se envía cuando invitas a un cliente para que active su cuenta.",
+    variables: BASE_VARS,
+    defaults: {
+      subject: "Activa tu cuenta en {{marca}}",
+      body: "Hola {{nombre}}:\n\nTe damos la bienvenida a {{marca}}. Para activar tu cuenta, crea tu contraseña con el siguiente botón.\n\nEste enlace vence en 7 días.",
+      buttonLabel: "Activar mi cuenta",
+    },
+  },
+  reset_password: {
+    label: "Recuperar contraseña",
+    description: "Se envía cuando alguien pide restablecer su contraseña.",
+    variables: BASE_VARS,
+    defaults: {
+      subject: "Restablece tu contraseña de {{marca}}",
+      body: "Hola {{nombre}}:\n\nRecibimos una solicitud para restablecer tu contraseña en {{marca}}.\n\nEste enlace vence en 1 hora. Si no lo solicitaste, ignora este correo.",
+      buttonLabel: "Crear nueva contraseña",
+    },
+  },
+  deletion_requested: {
+    label: "Solicitud de eliminación (al cliente)",
+    description: "Confirma al cliente que recibimos su pedido de eliminar su cuenta.",
+    variables: BASE_VARS,
+    defaults: {
+      subject: "Recibimos tu solicitud de eliminación de cuenta",
+      body: "Hola {{nombre}}:\n\nRecibimos tu solicitud para eliminar tu cuenta en {{marca}} y todos tus datos. La procesaremos pronto; cuando lo hagamos, ya no podrás ingresar.\n\nSi cambiaste de opinión, puedes cancelar la solicitud desde tu perfil.",
+      buttonLabel: "Ir a mi perfil",
+    },
+  },
+  deletion_request_admin: {
+    label: "Solicitud de eliminación (a ti)",
+    description: "Te avisa que un cliente pidió eliminar su cuenta.",
+    variables: [...BASE_VARS, "cliente", "correo_cliente"],
+    defaults: {
+      subject: "Solicitud de eliminación de cuenta: {{cliente}}",
+      body: "Hola {{nombre}}:\n\n{{cliente}} ({{correo_cliente}}) solicitó eliminar su cuenta y todos sus datos. Revisa la solicitud en su ficha.\n\nSegún la política de privacidad, debes atender la solicitud dentro de los plazos legales.",
+      buttonLabel: "Ver ficha del cliente",
+    },
+  },
+};
+
+export const emailTemplateSchema = z.object({
+  subject: z.string().trim().min(1, "El asunto es obligatorio").max(200),
+  body: z.string().trim().min(1, "El texto es obligatorio").max(5000),
+  buttonLabel: z.string().trim().min(1, "El texto del botón es obligatorio").max(60),
+});
+
+export interface EmailTemplateDTO extends EmailTemplateContent {
+  key: EmailTemplateKey;
+  label: string;
+  description: string;
+  variables: string[];
+  /** True when the tenant has customized this template. */
+  isCustom: boolean;
+  defaults: EmailTemplateContent;
+}
+
+// =====================================================================
+// F4 — Platform: tenants, metrics, impersonation (D60–D68)
+// =====================================================================
+
+export const TENANT_STATUSES = ["active", "suspended"] as const;
+export type TenantStatus = (typeof TENANT_STATUSES)[number];
+
+const subdomain = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9](?:[a-z0-9-]{0,40}[a-z0-9])?$/, "Usa solo letras minúsculas, números y guiones (sin espacios ni tildes)");
+
+export const createTenantSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  subdomain,
+  adminName: z.string().trim().min(2).max(120),
+  adminEmail: email,
+});
+
+export const updateTenantSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  status: z.enum(TENANT_STATUSES),
+});
+
+export const inviteTenantAdminSchema = z.object({ name: z.string().trim().min(2).max(120), email });
+
+export interface TenantMetricsDTO {
+  clientsActive: number;
+  clientsInvited: number;
+  routes: number;
+  cvRunsMonth: number;
+  cvRunsTotal: number;
+  /** Sum of recorded LLM cost this calendar month (Lima); null when no pricing is configured. */
+  llmCostMonthUsd: number | null;
+  lastActivityAt: string | null;
+}
+
+export interface TenantSummaryDTO {
+  id: string;
+  slug: string;
+  name: string;
+  domain: string | null;
+  status: TenantStatus;
+  isMain: boolean;
+  createdAt: string;
+  metrics: TenantMetricsDTO;
+}
+
+export interface TenantAdminDTO {
+  id: string;
+  name: string;
+  email: string;
+  status: UserStatus;
+  lastLoginAt: string | null;
+}
+
+export interface TenantDetailDTO extends TenantSummaryDTO {
+  admins: TenantAdminDTO[];
+  /** Base domain for tenant subdomains, e.g. "genia.pro" (D62). */
+  domainSuffix: string;
 }

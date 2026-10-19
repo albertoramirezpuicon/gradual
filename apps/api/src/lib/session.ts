@@ -44,8 +44,10 @@ export function clearSessionCookie(res: Response) {
   res.clearCookie(SESSION_COOKIE, { path: "/" });
 }
 
-export async function toMe(u: UserRow): Promise<Me> {
+/** Current user as seen by the web app. Pass the request to include support-mode info (D66). */
+export async function toMe(u: UserRow, req?: Request): Promise<Me> {
   return {
+    impersonation: req?.impersonator ? { tenantName: req.tenant.name, superadminName: req.impersonator.name } : null,
     id: u.id,
     email: u.email,
     name: u.name,

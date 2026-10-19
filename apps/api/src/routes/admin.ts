@@ -10,10 +10,10 @@ import {
   LOGO_MAX_BYTES,
 } from "@gradual/shared";
 import { db } from "../db/knex.js";
-import { env } from "../lib/env.js";
 import { HttpError, parse, newId, newToken, now, addMs, DAY, iso } from "../lib/util.js";
 import { requireRole, currentPolicy, type UserRow } from "../middleware/context.js";
-import { sendMail, invitationMail } from "../lib/mail.js";
+import { sendTemplate } from "../lib/email-templates.js";
+import type { TenantRow } from "../middleware/context.js";
 import { getBranding } from "../lib/branding.js";
 import { presignPut, headObject, deleteObject, keys } from "../lib/s3.js";
 import { toPolicyDTO } from "./auth.js";
@@ -42,7 +42,7 @@ adminRouter.get("/clients", async (req, res) => {
 });
 
 /** Invalidates any pending invitation for the user and emails a new one (valid 7 days). */
-async function sendInvitation(tenantId: string, u: UserRow) {
+export async function sendInvitation(tenant: Pick<TenantRow, "id" | "domain">, u: UserRow) {
   await db("gradual_auth_tokens").where({ user_id: u.id, type: "invitation" }).whereNull("used_at").update({ used_at: now() });
   const { token, hash } = newToken();
   await db("gradual_auth_tokens").insert({
@@ -53,16 +53,7 @@ async function sendInvitation(tenantId: string, u: UserRow) {
     expires_at: addMs(now(), 7 * DAY),
     created_at: now(),
   });
-  const b = await getBranding(tenantId);
-  await sendMail(
-    invitationMail({
-      to: u.email,
-      name: u.name,
-      brand: b.brandName,
-      color: b.primaryColor,
-      url: `${env.APP_BASE_URL}/invitation?token=${token}`,
-    }),
-  );
+  await sendTemplate(tenant, "invitation", u.email, { nombre: u.name }, `/invitation?token=${token}`);
 }
 
 adminRouter.post("/clients", async (req, res) => {
@@ -92,7 +83,7 @@ adminRouter.post("/clients", async (req, res) => {
     created_at: now(),
   };
   await db("gradual_users").insert(u);
-  await sendInvitation(req.tenant.id, u);
+  await sendInvitation(req.tenant, u);
   res.status(201).json(toClientDTO(u));
 });
 
@@ -102,7 +93,7 @@ adminRouter.post("/clients/:id/resend-invitation", async (req, res) => {
     .first();
   if (!u) throw new HttpError(404, "Cliente no encontrado.");
   if (u.status !== "invited") throw new HttpError(409, "Este cliente ya activó su cuenta.");
-  await sendInvitation(req.tenant.id, u);
+  await sendInvitation(req.tenant, u);
   res.json({ ok: true });
 });
 

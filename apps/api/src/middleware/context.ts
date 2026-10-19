@@ -2,13 +2,14 @@ import type { Request, Response, NextFunction } from "express";
 import { db } from "../db/knex.js";
 import { env } from "../lib/env.js";
 import { HttpError, hashToken, now, addMs, DAY } from "../lib/util.js";
-import type { Role, UserStatus } from "@gradual/shared";
+import type { Role, TenantStatus, UserStatus } from "@gradual/shared";
 
 export interface TenantRow {
   id: string;
   slug: string;
   name: string;
   domain: string | null;
+  status?: TenantStatus;
 }
 
 export interface UserRow {
@@ -34,6 +35,8 @@ declare global {
       tenant: TenantRow;
       user?: UserRow;
       sessionId?: string;
+      /** The superadmin behind a support-mode session; `user` is then the impersonated admin (D66). */
+      impersonator?: UserRow;
     }
   }
 }
@@ -53,15 +56,16 @@ export async function resolveTenant(req: Request, _res: Response, next: NextFunc
   const rawHost = (req.get("x-forwarded-host") ?? req.get("host") ?? "").split(",")[0]!.trim();
   const host = rawHost.replace(/:\d+$/, "").toLowerCase();
   const hit = cache.get(host);
-  if (hit && Date.now() - hit.at < CACHE_MS) {
-    req.tenant = hit.t;
-    return next();
+  let t: TenantRow | undefined = hit && Date.now() - hit.at < CACHE_MS ? hit.t : undefined;
+  if (!t) {
+    t = host ? await db("gradual_tenants").where({ domain: host }).first() : undefined;
+    t ??= await db("gradual_tenants").where({ slug: env.DEFAULT_TENANT_SLUG }).first();
+    if (!t) throw new HttpError(503, "La plataforma aún no está configurada.");
+    cache.set(host, { t, at: Date.now() });
   }
-  let t: TenantRow | undefined = host ? await db("gradual_tenants").where({ domain: host }).first() : undefined;
-  t ??= await db("gradual_tenants").where({ slug: env.DEFAULT_TENANT_SLUG }).first();
-  if (!t) throw new HttpError(503, "La plataforma aún no está configurada.");
-  cache.set(host, { t, at: Date.now() });
   req.tenant = t;
+  // Suspended tenants are closed to their users (D68)
+  if (t.status === "suspended") throw new HttpError(503, "Este espacio está suspendido temporalmente.");
   next();
 }
 
@@ -76,12 +80,24 @@ export async function loadSession(req: Request, _res: Response, next: NextFuncti
     .andWhere("s.expires_at", ">", now())
     .andWhere("u.tenant_id", req.tenant.id)
     .andWhere("u.status", "active")
-    .select("u.*", "s.id as session_id", "s.expires_at as session_expires_at")
+    .select("u.*", "s.id as session_id", "s.expires_at as session_expires_at", "s.acting_user_id")
     .first();
   if (row) {
-    const { session_id, session_expires_at, ...user } = row;
+    const { session_id, session_expires_at, acting_user_id, ...user } = row;
     req.user = user as UserRow;
     req.sessionId = session_id;
+    // Support mode: a superadmin session acting as a tenant admin. Tenant and user switch to the target.
+    if (acting_user_id && user.role === "superadmin") {
+      const acting: UserRow | undefined = await db("gradual_users").where({ id: acting_user_id, role: "admin", status: "active" }).first();
+      const tenant: TenantRow | undefined = acting ? await db("gradual_tenants").where({ id: acting.tenant_id }).first() : undefined;
+      if (acting && tenant) {
+        req.impersonator = user as UserRow;
+        req.user = acting;
+        req.tenant = tenant;
+      } else {
+        await db("gradual_sessions").where({ id: session_id }).update({ acting_user_id: null });
+      }
+    }
     // Sliding renewal: extend the session when less than half of its lifetime remains.
     const life = env.SESSION_DAYS * DAY;
     if (new Date(session_expires_at).getTime() - Date.now() < life / 2) {

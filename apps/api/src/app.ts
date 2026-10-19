@@ -8,6 +8,8 @@ import { adminRouter } from "./routes/admin.js";
 import { adminRoutesRouter } from "./routes/admin-routes.js";
 import { meRouter, assertClientRouteAccess } from "./routes/me.js";
 import { cvRouter } from "./routes/cv.js";
+import { adminEmailsRouter } from "./routes/admin-emails.js";
+import { platformRouter } from "./routes/platform.js";
 import { getResource } from "./lib/routes.js";
 import { requireAuth, requireConsent } from "./middleware/context.js";
 import { getBranding } from "./lib/branding.js";
@@ -51,7 +53,8 @@ export function createApp() {
   });
 
   v1.use("/auth", authRouter);
-  v1.use("/admin", adminRouter, adminRoutesRouter);
+  v1.use("/admin", adminRouter, adminRoutesRouter, adminEmailsRouter);
+  v1.use("/platform", platformRouter);
   v1.use("/me", meRouter);
   v1.use("/cv", cvRouter);
 
