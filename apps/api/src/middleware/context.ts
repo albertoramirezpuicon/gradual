@@ -23,6 +23,7 @@ export interface UserRow {
   locked_until: Date | null;
   last_login_at: Date | null;
   invited_by: string | null;
+  deletion_requested_at: Date | null;
   created_at: Date;
 }
 

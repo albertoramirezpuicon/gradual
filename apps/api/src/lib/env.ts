@@ -3,6 +3,8 @@ import { z } from "zod";
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(4000),
+  /** Interface to bind. Use 127.0.0.1 in production (nginx in front); 0.0.0.0 to reach it from the LAN. */
+  HOST: z.string().default("0.0.0.0"),
   APP_BASE_URL: z.string().url(),
   DEFAULT_TENANT_SLUG: z.string().default("gradual"),
 

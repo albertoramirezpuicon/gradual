@@ -14,6 +14,7 @@ export default async function AdminHome() {
   const active = clients.filter((c) => c.status === "active").length;
   const pending = clients.filter((c) => c.status === "invited").length;
   const policyIncomplete = policy ? PLACEHOLDER.test(policy.content) : true;
+  const deletionRequests = clients.filter((c) => c.deletionRequestedAt);
 
   return (
     <>
@@ -26,6 +27,22 @@ export default async function AdminHome() {
               Complétala
             </Link>{" "}
             antes de invitar a clientes reales.
+          </Alert>
+        </div>
+      ) : null}
+      {deletionRequests.length ? (
+        <div className="mb-6">
+          <Alert tone="warning">
+            {deletionRequests.length === 1 ? "1 cliente pidió" : `${deletionRequests.length} clientes pidieron`} eliminar su cuenta:{" "}
+            {deletionRequests.map((c, i) => (
+              <span key={c.id}>
+                {i ? ", " : ""}
+                <Link href={`/admin/clients/${c.id}`} className="font-semibold underline">
+                  {c.name}
+                </Link>
+              </span>
+            ))}
+            .
           </Alert>
         </div>
       ) : null}

@@ -1,6 +1,6 @@
 import request from "supertest";
 import { createApp } from "../src/app.js";
-import { db } from "../src/db/knex.js";
+import { db, migrateLatest } from "../src/db/knex.js";
 import { ensureTenant } from "../src/lib/bootstrap.js";
 import { hashPassword } from "../src/lib/session.js";
 import { newId, now } from "../src/lib/util.js";
@@ -32,7 +32,7 @@ export async function resetDb() {
   if (!process.env.DB_NAME?.endsWith("_test")) {
     throw new Error(`Tests blocked: DB_NAME="${process.env.DB_NAME}" does not end with _test`);
   }
-  await db.migrate.latest();
+  await migrateLatest();
   await db.raw("SET FOREIGN_KEY_CHECKS = 0");
   for (const t of TABLES) await db(t).truncate();
   await db.raw("SET FOREIGN_KEY_CHECKS = 1");

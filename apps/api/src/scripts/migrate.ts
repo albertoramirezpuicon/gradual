@@ -1,4 +1,4 @@
-import { db } from "../db/knex.js";
+import { db, migrateLatest } from "../db/knex.js";
 
 // Usage: npm run migrate             → apply pending migrations
 //        npm run migrate -- rollback → roll back the last batch
@@ -8,7 +8,7 @@ try {
     const [batch, files] = await db.migrate.rollback();
     console.log(`Rolled back batch ${batch}:`, files);
   } else {
-    const [batch, files] = await db.migrate.latest();
+    const [batch, files] = await migrateLatest();
     console.log(files.length ? `Applied batch ${batch}:` : "No pending migrations.", files);
   }
 } finally {

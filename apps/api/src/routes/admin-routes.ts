@@ -9,6 +9,7 @@ import {
   resourceUploadSchema,
   completionSchema,
   clientRoutesSchema,
+  deleteClientSchema,
   parseYouTubeId,
   RESOURCE_MIME,
   RESOURCE_MAX_BYTES,
@@ -22,6 +23,7 @@ import { HttpError, parse, newId, now, iso } from "../lib/util.js";
 import { requireRole, type UserRow } from "../middleware/context.js";
 import { presignPut, headObject, deleteObject, keys } from "../lib/s3.js";
 import { sanitizeRichText } from "../lib/sanitize.js";
+import { deleteClientData } from "../lib/deletion.js";
 import {
   getRoute,
   getStage,
@@ -283,6 +285,7 @@ adminRoutesRouter.get("/clients/:id", async (req, res) => {
     status: u.status,
     createdAt: iso(u.created_at)!,
     lastLoginAt: iso(u.last_login_at),
+    deletionRequestedAt: iso(u.deletion_requested_at),
     routes: assigned.map((r) => ({
       id: r.id,
       title: r.title,
@@ -294,6 +297,20 @@ adminRoutesRouter.get("/clients/:id", async (req, res) => {
     availableRoutes: all.map((r) => ({ id: r.id, title: r.title, published: Boolean(r.published) })),
   };
   res.json(body);
+});
+
+/**
+ * Permanently deletes a client and all their data (D25 / D53).
+ * The admin must type the client's exact name to confirm.
+ */
+adminRoutesRouter.delete("/clients/:id", async (req, res) => {
+  const u = await getClient(req.tenant.id, req.params.id);
+  const { confirmName } = parse(deleteClientSchema, req.body);
+  if (confirmName.trim().toLowerCase() !== u.name.trim().toLowerCase()) {
+    throw new HttpError(400, "El nombre no coincide. Escríbelo exactamente como aparece para confirmar.");
+  }
+  const filesRemoved = await deleteClientData(req.tenant.id, u.id);
+  res.json({ ok: true, filesRemoved });
 });
 
 /** Replaces the set of routes assigned to a client. Progress is kept if a route is re-assigned later. */

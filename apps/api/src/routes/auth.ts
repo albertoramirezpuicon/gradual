@@ -15,7 +15,7 @@ import { env } from "../lib/env.js";
 import { HttpError, parse, hashToken, newId, newToken, now, addMs, iso, HOUR } from "../lib/util.js";
 import { requireAuth, currentPolicy, type UserRow } from "../middleware/context.js";
 import { hashPassword, verifyPassword, dummyVerify, startSession, clearSessionCookie, toMe } from "../lib/session.js";
-import { sendMail, resetPasswordMail } from "../lib/mail.js";
+import { sendMail, resetPasswordMail, deletionRequestedMail, deletionRequestAdminMail } from "../lib/mail.js";
 import { getBranding } from "../lib/branding.js";
 
 export const authRouter = Router();
@@ -207,4 +207,43 @@ authRouter.post("/change-password", requireAuth, async (req, res) => {
   // Sign out all other open sessions
   await db("gradual_sessions").where({ user_id: u.id }).whereNot({ id: req.sessionId! }).delete();
   res.json({ ok: true });
+});
+
+// ---------- Account deletion request (D25 / D52) ----------
+
+/** The client asks to delete their account; the admin is notified and performs the deletion. */
+authRouter.post("/deletion-request", requireAuth, async (req, res) => {
+  const u = req.user!;
+  if (u.role !== "client") throw new HttpError(403, "Solo los clientes pueden solicitar la eliminación de su cuenta.");
+  if (!u.deletion_requested_at) {
+    const at = now();
+    await db("gradual_users").where({ id: u.id }).update({ deletion_requested_at: at });
+    u.deletion_requested_at = at;
+    const b = await getBranding(req.tenant.id);
+    await sendMail(
+      deletionRequestedMail({ to: u.email, name: u.name, brand: b.brandName, color: b.primaryColor, url: `${env.APP_BASE_URL}/app/profile` }),
+    );
+    const admins: UserRow[] = await db("gradual_users").where({ tenant_id: req.tenant.id, role: "admin", status: "active" });
+    for (const a of admins) {
+      await sendMail(
+        deletionRequestAdminMail({
+          to: a.email,
+          name: a.name,
+          brand: b.brandName,
+          color: b.primaryColor,
+          url: `${env.APP_BASE_URL}/admin/clients/${u.id}`,
+          clientName: u.name,
+          clientEmail: u.email,
+        }),
+      );
+    }
+  }
+  res.json(await toMe(u));
+});
+
+authRouter.delete("/deletion-request", requireAuth, async (req, res) => {
+  const u = req.user!;
+  await db("gradual_users").where({ id: u.id }).update({ deletion_requested_at: null });
+  u.deletion_requested_at = null;
+  res.json(await toMe(u));
 });

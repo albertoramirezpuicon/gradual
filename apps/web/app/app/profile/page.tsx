@@ -3,6 +3,7 @@ import { getMe } from "@/lib/server";
 import { PageHeader } from "@/components/shell";
 import { Card } from "@/components/ui";
 import { ChangePassword } from "./change-password";
+import { DeletionCard } from "./deletion";
 
 export const metadata: Metadata = { title: "Mi perfil" };
 
@@ -22,6 +23,7 @@ export default async function Page() {
           </a>
         </Card>
         <ChangePassword />
+        <DeletionCard requestedAt={me.deletionRequestedAt} />
       </div>
     </>
   );

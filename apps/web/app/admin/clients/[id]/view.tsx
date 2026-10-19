@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ClientDetailDTO } from "@gradual/shared";
 import { api } from "@/lib/api";
 import { Modal } from "@/components/modal";
 import { CheckIcon } from "@/components/icons";
 import { ProgressBar } from "@/components/progress";
-import { Alert, Badge, Button, Card, cn } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, Input, cn } from "@/components/ui";
 
 const fmt = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("es-PE", { timeZone: "America/Lima", day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -49,6 +50,13 @@ export function ClientDetail({ initial }: { initial: ClientDetailDTO }) {
           <Button onClick={() => setAssignOpen(true)}>Asignar rutas</Button>
         </div>
       </div>
+      {c.deletionRequestedAt ? (
+        <div className="mb-4">
+          <Alert tone="warning">
+            Este cliente pidió eliminar su cuenta el {fmt(c.deletionRequestedAt)}. Puedes hacerlo al final de esta página.
+          </Alert>
+        </div>
+      ) : null}
       {error ? (
         <div className="mb-4">
           <Alert>{error}</Alert>
@@ -106,8 +114,61 @@ export function ClientDetail({ initial }: { initial: ClientDetailDTO }) {
         </div>
       )}
 
+      <DeleteClient client={c} />
+
       <AssignDialog open={assignOpen} onOpenChange={setAssignOpen} client={c} onSaved={reload} />
     </>
+  );
+}
+
+/** Danger zone: permanent deletion of the client and all their data, confirmed by typing the name (D53). */
+function DeleteClient({ client }: { client: ClientDetailDTO }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const matches = typed.trim().toLowerCase() === client.name.trim().toLowerCase();
+
+  async function remove() {
+    setLoading(true);
+    setError(null);
+    try {
+      await api(`/admin/clients/${client.id}`, { method: "DELETE", body: { confirmName: typed } });
+      router.push("/admin/clients");
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card className="mt-8 border-red-200 p-5">
+      <p className="font-semibold text-red-800">Eliminar cliente</p>
+      <p className="mt-1 text-sm text-stone-600">
+        Elimina definitivamente su cuenta, su avance, sus análisis de CV y sus archivos. No se puede deshacer.
+      </p>
+      <Button variant="danger" size="sm" className="mt-3" onClick={() => (setOpen(true), setTyped(""), setError(null))}>
+        Eliminar cliente
+      </Button>
+      <Modal open={open} onOpenChange={setOpen} title={`¿Eliminar a ${client.name}?`} description="Se borrarán todos sus datos de forma permanente.">
+        <div className="space-y-4">
+          {error ? <Alert>{error}</Alert> : null}
+          <Field label={`Escribe “${client.name}” para confirmar`} htmlFor="confirm-name">
+            <Input id="confirm-name" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={remove} disabled={!matches} loading={loading}>
+              Eliminar definitivamente
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </Card>
   );
 }
 

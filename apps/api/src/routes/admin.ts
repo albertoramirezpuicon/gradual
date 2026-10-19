@@ -28,6 +28,7 @@ const toClientDTO = (u: UserRow): ClientDTO => ({
   status: u.status,
   createdAt: iso(u.created_at)!,
   lastLoginAt: iso(u.last_login_at),
+  deletionRequestedAt: iso(u.deletion_requested_at),
 });
 
 // ---------- Clients ----------
@@ -87,6 +88,7 @@ adminRouter.post("/clients", async (req, res) => {
     locked_until: null,
     last_login_at: null,
     invited_by: req.user!.id,
+    deletion_requested_at: null,
     created_at: now(),
   };
   await db("gradual_users").insert(u);

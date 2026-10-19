@@ -89,3 +89,25 @@ export function resetPasswordMail(p: MailParams): Mail {
     ),
   };
 }
+
+/** To the client: confirms their deletion request was received (D52). */
+export function deletionRequestedMail(p: MailParams): Mail {
+  const body = `Hola ${esc(p.name)}:<br><br>Recibimos tu solicitud para eliminar tu cuenta en <b>${esc(p.brand)}</b> y todos tus datos. Tu consultora la procesará pronto; cuando lo haga, ya no podrás ingresar.<br><br>Si cambiaste de opinión, puedes cancelar la solicitud desde tu perfil.`;
+  return {
+    to: p.to,
+    subject: `Recibimos tu solicitud de eliminación de cuenta`,
+    text: `Hola ${p.name}:\n\nRecibimos tu solicitud para eliminar tu cuenta en ${p.brand} y todos tus datos. Tu consultora la procesará pronto.\n\nSi cambiaste de opinión, puedes cancelarla desde tu perfil:\n${p.url}`,
+    html: layout(p.brand, p.color, body, { label: "Ir a mi perfil", url: p.url }, "Si no hiciste esta solicitud, ingresa y cancélala desde tu perfil."),
+  };
+}
+
+/** To the admin(s): a client asked to delete their account (D52). */
+export function deletionRequestAdminMail(p: MailParams & { clientName: string; clientEmail: string }): Mail {
+  const body = `Hola ${esc(p.name)}:<br><br><b>${esc(p.clientName)}</b> (${esc(p.clientEmail)}) solicitó eliminar su cuenta y todos sus datos. Revisa la solicitud en su ficha.`;
+  return {
+    to: p.to,
+    subject: `Solicitud de eliminación de cuenta: ${p.clientName}`,
+    text: `Hola ${p.name}:\n\n${p.clientName} (${p.clientEmail}) solicitó eliminar su cuenta y todos sus datos. Revisa la solicitud aquí:\n${p.url}`,
+    html: layout(p.brand, p.color, body, { label: "Ver ficha del cliente", url: p.url }, "Según la política de privacidad, debes atender la solicitud dentro de los plazos legales."),
+  };
+}

@@ -2,7 +2,7 @@
 
 > Canonical reference document. Every decision is numbered, locked in order and cited by number. When a decision changes, it is updated here and the version is bumped.
 
-**Status:** v1.5 · 2026-10-18 · F0, F1 and F2 built · Decisions D1–D51
+**Status:** v1.6 · 2026-10-19 · F0–F3 built (v1 feature-complete) · Decisions D1–D56
 
 ---
 
@@ -116,7 +116,7 @@ Every table uses the `gradual_` prefix (D33); it is omitted below for brevity.
 |---|---|
 | `tenants` | id, slug, name, domain |
 | `tenant_settings` | tenant_id, brand_name, primary_color, secondary_color, font, logo_s3_key |
-| `users` | id, tenant_id, role (admin/client), email, name, password_hash, status (invited/active/deleted), failed_logins, locked_until, last_login_at, invited_by, created_at |
+| `users` | id, tenant_id, role (admin/client), email, name, password_hash, status (invited/active/deleted), failed_logins, locked_until, last_login_at, invited_by, deletion_requested_at, created_at |
 | `auth_tokens` | id, user_id, type (invitation/reset), token_hash, expires_at, used_at |
 | `sessions` | id, user_id, token_hash, expires_at, ip, user_agent |
 | `privacy_policies` | id, tenant_id, version, content, published_by, published_at |
@@ -293,3 +293,29 @@ Invitation, password recovery, deletion-request confirmation. The sender is conf
   - Admin-started runs appear in the client's history, marked "iniciado por la consultora", and don't count toward the monthly quota.
   - Clients only ever see their own runs.
 - **Input limits:** PDF only, up to 5 MB and 6 pages. PDFs with fewer than 200 characters of extractable text are rejected as scanned. The upload is deleted whenever a run is rejected.
+
+## 15. F3 decisions
+
+- **D52. Deletion request:** the client requests it from "Mi perfil".
+  - The request is stored as `users.deletion_requested_at`, so no new table or GRANT is needed.
+  - The client gets a confirmation email and every admin gets a notification.
+  - The admin sees it on the dashboard, in the client list and on the client page.
+  - The client can cancel while the request is pending.
+  - Requesting deletion does not require accepting a new policy version.
+- **D53. Client deletion:** permanent, run by the admin from the client page after typing the client's name to confirm.
+  - Sessions, tokens, consents, assignments, completions and CV runs cascade from the user row.
+  - The client's original CV PDFs are deleted from S3 afterwards (best-effort).
+  - Routes and resources are not touched.
+- **D54. Daily maintenance:** runs inside the API process, one minute after startup and then every 24 h.
+  - Original CV PDFs older than 180 days are deleted from S3 and `source_s3_key` is set to null; the analysis result stays (D28).
+  - Expired sessions are deleted.
+  - Used or expired auth tokens older than a day are deleted.
+  - The job is idempotent.
+- **D55. Production:**
+  - Same EC2, PM2 (`ecosystem.config.cjs`, one API instance because the worker and job run inside it), nginx (`docs/deploy/nginx-gradual.conf`) and certbot HTTPS.
+  - API and web bind to 127.0.0.1.
+  - Separate `gradual-prod` bucket; AWS access comes from the EC2 instance role.
+  - `COOKIE_SECURE=true`, `MAIL_TRANSPORT=ses`.
+  - Step-by-step guide: `docs/deploy/DEPLOY.md`.
+- **D56. Migration history:** migration names are recorded without file extension (custom Knex migration source). The same history works from TypeScript (dev) and compiled JS (prod). Older `.ts` names are normalized automatically by `migrateLatest()`.
+- **Polish:** Spanish 404 and error pages; Next's defaults were in English and are customer-facing.

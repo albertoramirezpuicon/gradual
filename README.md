@@ -58,7 +58,7 @@ npm test
 - **F0 ✅** Tenant, authentication (invitation, login, password recovery, lockout after 10 attempts), versioned privacy-policy consent, branding settings (logo, colors, font).
 - **F1 ✅** Routes (draft/published), stages, resources (file on S3, link, YouTube video, rich text), assignment to clients, per-stage progress marked by client or admin.
 - **F2 ✅** CV improver: PDF upload, text extraction, versioned standards prompt, LLM rotation with failover (background worker), score + per-section comments, PDF/DOCX download, 5 runs/month per client.
-- **F3** Retention, data deletion, SES and deployment.
+- **F3 ✅** Client deletion requests and admin hard delete, daily retention purge (CV PDFs > 180 days) and cleanup, production setup (PM2, nginx, HTTPS). Deploy guide: [`docs/deploy/DEPLOY.md`](docs/deploy/DEPLOY.md).
 
 ## Notes
 

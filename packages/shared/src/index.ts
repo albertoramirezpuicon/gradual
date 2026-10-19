@@ -104,6 +104,8 @@ export interface Me {
   email: string;
   name: string;
   role: Role;
+  /** ISO date when the client asked to delete their account (D52), or null. */
+  deletionRequestedAt: string | null;
   /** True when a published policy version exists that this user has not accepted yet. */
   requiresConsent: boolean;
 }
@@ -129,7 +131,12 @@ export interface ClientDTO {
   status: UserStatus;
   createdAt: string;
   lastLoginAt: string | null;
+  /** ISO date of a pending deletion request (D52), or null. */
+  deletionRequestedAt: string | null;
 }
+
+/** Admin deletes a client: the client's exact name must be typed to confirm (D53). */
+export const deleteClientSchema = z.object({ confirmName: z.string().trim().min(1).max(120) });
 
 export interface InvitationDTO {
   email: string;

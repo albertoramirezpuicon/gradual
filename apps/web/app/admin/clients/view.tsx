@@ -79,7 +79,13 @@ export function ClientsView({ initial }: { initial: ClientDTO[] }) {
                       </td>
                       <td className="px-4 py-3 text-stone-600">{c.email}</td>
                       <td className="px-4 py-3">
-                        {c.status === "active" ? <Badge tone="success">Activo</Badge> : <Badge tone="warning">Invitación pendiente</Badge>}
+                        {c.deletionRequestedAt ? (
+                          <Badge tone="warning">Pidió eliminar su cuenta</Badge>
+                        ) : c.status === "active" ? (
+                          <Badge tone="success">Activo</Badge>
+                        ) : (
+                          <Badge tone="warning">Invitación pendiente</Badge>
+                        )}
                       </td>
                       <td className="px-4 py-3 tabular-nums text-stone-600">{fmt(c.lastLoginAt)}</td>
                       <td className="px-4 py-3 text-right">

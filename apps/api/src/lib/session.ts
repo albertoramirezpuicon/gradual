@@ -50,6 +50,7 @@ export async function toMe(u: UserRow): Promise<Me> {
     email: u.email,
     name: u.name,
     role: u.role,
+    deletionRequestedAt: u.deletion_requested_at ? new Date(u.deletion_requested_at).toISOString() : null,
     requiresConsent: await needsConsent(u),
   };
 }
